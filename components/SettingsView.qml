@@ -23,26 +23,26 @@ Item {
                               || bluetoothToggle.pressed
 
     anchors.fill: parent
-    anchors.margins: 16
+    anchors.margins: Config.contentMargin
 
     Column {
         anchors.fill: parent
-        spacing: 7
+        spacing: Math.round(7 * Config.scale)
         // Positioner skips invisible children, so hidden rows leave no gap.
 
         // ---- volume --------------------------------------------------------
         Item {
             id: volumeRow
             width: parent.width
-            height: 38
+            height: Config.rowHeight
             visible: view.volume && view.volume.available
 
             Kirigami.Icon {
                 id: volumeIcon
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: 18
-                height: 18
+                width: Config.iconSize
+                height: Config.iconSize
                 color: Config.textColor
                 source: (view.volume && view.volume.muted) ? "audio-volume-muted"
                                                            : "audio-volume-high"
@@ -52,9 +52,9 @@ Item {
                 id: muteButton
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                implicitWidth: 22
-                implicitHeight: 22
-                iconSize: 15
+                implicitWidth: Math.round(22 * Config.scale)
+                implicitHeight: Math.round(22 * Config.scale)
+                iconSize: Math.round(15 * Config.scale)
                 icon: (view.volume && view.volume.muted) ? "audio-volume-muted"
                                                          : "audio-volume-high"
                 onClicked: if (view.volume) view.volume.toggleMute()
@@ -65,7 +65,7 @@ Item {
                 anchors.right: muteButton.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
-                width: 34
+                width: Math.round(34 * Config.scale)
                 horizontalAlignment: Text.AlignRight
                 text: Math.round(volumeSlider.displayValue * 100) + "%"
                 color: Config.textColor
@@ -75,11 +75,11 @@ Item {
             SettingSlider {
                 id: volumeSlider
                 anchors.left: volumeIcon.right
-                anchors.leftMargin: 10
+                anchors.leftMargin: Math.round(10 * Config.scale)
                 anchors.right: volumeLabel.left
-                anchors.rightMargin: 10
+                anchors.rightMargin: Math.round(10 * Config.scale)
                 anchors.verticalCenter: parent.verticalCenter
-                height: 18
+                height: Config.sliderHeight
                 value: view.volume ? view.volume.volume : 0
                 onCommitted: function(v) { if (view.volume) view.volume.setVolume(v) }
             }
@@ -89,15 +89,15 @@ Item {
         Item {
             id: brightnessRow
             width: parent.width
-            height: 38
+            height: Config.rowHeight
             visible: view.brightness && view.brightness.available
 
             Kirigami.Icon {
                 id: brightnessIcon
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: 18
-                height: 18
+                width: Config.iconSize
+                height: Config.iconSize
                 source: "brightness-high"
                 color: Config.textColor
             }
@@ -106,7 +106,7 @@ Item {
                 id: brightnessLabel
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                width: 34
+                width: Math.round(34 * Config.scale)
                 horizontalAlignment: Text.AlignRight
                 text: Math.round(brightnessSlider.displayValue * 100) + "%"
                 color: Config.textColor
@@ -116,11 +116,11 @@ Item {
             SettingSlider {
                 id: brightnessSlider
                 anchors.left: brightnessIcon.right
-                anchors.leftMargin: 10
+                anchors.leftMargin: Math.round(10 * Config.scale)
                 anchors.right: brightnessLabel.left
-                anchors.rightMargin: 10
+                anchors.rightMargin: Math.round(10 * Config.scale)
                 anchors.verticalCenter: parent.verticalCenter
-                height: 18
+                height: Config.sliderHeight
                 value: view.brightness ? view.brightness.percent / 100 : 0
                 onCommitted: function(v) {
                     if (view.brightness)
@@ -133,15 +133,15 @@ Item {
         Item {
             id: bluetoothRow
             width: parent.width
-            height: 38
+            height: Config.rowHeight
             visible: view.bluetooth && view.bluetooth.available
 
             Kirigami.Icon {
                 id: bluetoothIcon
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: 18
-                height: 18
+                width: Config.iconSize
+                height: Config.iconSize
                 source: "bluetooth"
                 color: Config.textColor
             }
@@ -156,9 +156,9 @@ Item {
 
             Text {
                 anchors.left: bluetoothIcon.right
-                anchors.leftMargin: 10
+                anchors.leftMargin: Math.round(10 * Config.scale)
                 anchors.right: bluetoothToggle.left
-                anchors.rightMargin: 10
+                anchors.rightMargin: Math.round(10 * Config.scale)
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
                 text: {
@@ -188,7 +188,7 @@ Item {
 
         signal committed(real value)
 
-        implicitHeight: 18
+        implicitHeight: Config.sliderHeight
 
         function valueFromX(x) {
             if (width <= 0)
@@ -201,24 +201,24 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            height: 4
-            radius: 2
+            height: Math.max(2, Math.round(4 * Config.scale))
+            radius: height / 2
             color: Config.progressTrackColor
         }
 
         Rectangle {
             anchors.left: sliderTrack.left
             anchors.verticalCenter: sliderTrack.verticalCenter
-            height: 4
-            radius: 2
+            height: sliderTrack.height
+            radius: sliderTrack.radius
             color: Config.accentColor
             width: sliderTrack.width * slider.displayValue
         }
 
         Rectangle {
             id: sliderHandle
-            width: 12
-            height: 12
+            width: Math.round(12 * Config.scale)
+            height: width
             radius: width / 2
             color: Config.accentColor
             anchors.verticalCenter: parent.verticalCenter
@@ -227,8 +227,8 @@ Item {
 
         MouseArea {
             anchors.fill: parent
-            anchors.topMargin: -5
-            anchors.bottomMargin: -5
+            anchors.topMargin: -Math.round(5 * Config.scale)
+            anchors.bottomMargin: -Math.round(5 * Config.scale)
             onPressed: function(mouse) {
                 slider.pressed = true
                 slider.dragValue = slider.valueFromX(mouse.x)
@@ -256,8 +256,8 @@ Item {
 
         signal toggled()
 
-        implicitWidth: 40
-        implicitHeight: 22
+        implicitWidth: Math.round(40 * Config.scale)
+        implicitHeight: Math.round(22 * Config.scale)
 
         Rectangle {
             id: toggleTrack
@@ -269,11 +269,11 @@ Item {
 
         Rectangle {
             id: toggleKnob
-            width: 16
-            height: 16
+            width: Math.round(16 * Config.scale)
+            height: width
             radius: width / 2
             anchors.verticalCenter: parent.verticalCenter
-            x: toggle.checked ? toggleTrack.width - width - 3 : 3
+            x: toggle.checked ? toggleTrack.width - width - Math.round(3 * Config.scale) : Math.round(3 * Config.scale)
             color: toggle.checked ? Config.pillColor : Config.textColor
             Behavior on x {
                 NumberAnimation { duration: Config.fadeDuration; easing.type: Easing.OutCubic }

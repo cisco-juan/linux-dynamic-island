@@ -34,6 +34,7 @@ Window {
         list.push("calendar")
         if (root.settingsAvailable)
             list.push("settings")
+        list.push("customize")
         if (root.currentNotification !== null)
             list.push("notification")
         return list
@@ -41,7 +42,8 @@ Window {
 
     readonly property int targetWidth: {
         if (root.expanded)
-            return Config.mediaExpandedWidth // every expanded page is 420 wide
+            return root.page === "customize" ? Config.customizeWidth
+                                             : Config.mediaExpandedWidth
         if (mode === "notification")
             return Config.notificationCompactWidth
         if (mode === "media")
@@ -50,9 +52,13 @@ Window {
     }
 
     readonly property int targetHeight: {
-        if (root.expanded)
-            return root.page === "notification" ? Config.notificationExpandedHeight
-                                                : Config.mediaExpandedHeight
+        if (root.expanded) {
+            if (root.page === "notification")
+                return Config.notificationExpandedHeight
+            if (root.page === "customize")
+                return Config.customizeHeight
+            return Config.mediaExpandedHeight
+        }
         if (mode === "notification")
             return Config.notificationCompactHeight
         if (mode === "media")
@@ -63,15 +69,31 @@ Window {
     width: targetWidth
     height: targetHeight + Config.topPadding
 
-    Behavior on width { NumberAnimation { duration: Config.sizeDuration; easing.type: Easing.OutBack } }
-    Behavior on height { NumberAnimation { duration: Config.sizeDuration; easing.type: Easing.OutBack } }
+    Behavior on width { NumberAnimation { duration: Config.sizeDuration; easing.type: Config.sizeEasing } }
+    Behavior on height { NumberAnimation { duration: Config.sizeDuration; easing.type: Config.sizeEasing } }
 
     // ---- layer shell -------------------------------------------------------
     LayerShell.Window.layer: LayerShell.Window.LayerOverlay
-    LayerShell.Window.anchors: LayerShell.Window.AnchorTop
+    // Horizontal placement follows the customize page's alignment knob. The
+    // unanchored axis is centered by the compositor, so plain AnchorTop means
+    // "center"; AnchorLeft/AnchorRight pin the pill to an edge (no margins).
+    LayerShell.Window.anchors: {
+        var value = LayerShell.Window.AnchorTop
+        if (IslandConfig.alignment === "left")
+            value |= LayerShell.Window.AnchorLeft
+        else if (IslandConfig.alignment === "right")
+            value |= LayerShell.Window.AnchorRight
+        return value
+    }
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.exclusionZone: 0
     LayerShell.Window.scope: "dynamic-island"
+
+    // Target monitor chosen on the customize page. `wantsToBeOnActiveScreen`
+    // lets the compositor follow focus when the user picked "active"; otherwise
+    // the surface is pinned to the resolved screen.
+    LayerShell.Window.screen: IslandConfig.targetScreen
+    LayerShell.Window.wantsToBeOnActiveScreen: IslandConfig.followActiveScreen
 
     // ---- backends ----------------------------------------------------------
     MediaController {
@@ -170,7 +192,7 @@ Window {
     // the page has something to render.
     function forceDebugPage(id) {
         if (id !== "media" && id !== "calendar" && id !== "settings"
-                && id !== "notification")
+                && id !== "customize" && id !== "notification")
             return
         if (id === "notification" && root.currentNotification === null) {
             root.currentNotification = {

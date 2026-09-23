@@ -18,7 +18,7 @@ Item {
     readonly property string monthHeader: new Date(viewYear, viewMonth, 1)
                                           .toLocaleDateString(Qt.locale(), "MMMM yyyy")
     readonly property real cellWidth: grid.width / 7
-    readonly property real cellHeight: 15
+    readonly property real cellHeight: Math.round(15 * Config.scale)
 
     // Builds one cell per grid slot: leading blanks, then the days of the
     // month with a `today` flag for the accent circle.
@@ -51,7 +51,7 @@ Item {
     }
 
     anchors.fill: parent
-    anchors.margins: 10
+    anchors.margins: Math.round(10 * Config.scale)
 
     Text {
         id: header
@@ -69,7 +69,7 @@ Item {
         anchors.verticalCenter: header.verticalCenter
         text: "\u2039" // single left angle quote
         color: prevHover.hovered ? Config.textColor : Config.secondaryTextColor
-        font.pixelSize: 16
+        font.pixelSize: Config.glyphSize
         Behavior on color { ColorAnimation { duration: Config.fadeDuration } }
 
         HoverHandler {
@@ -89,7 +89,7 @@ Item {
         anchors.verticalCenter: header.verticalCenter
         text: "\u203a" // single right angle quote
         color: nextHover.hovered ? Config.textColor : Config.secondaryTextColor
-        font.pixelSize: 16
+        font.pixelSize: Config.glyphSize
         Behavior on color { ColorAnimation { duration: Config.fadeDuration } }
 
         HoverHandler {
@@ -106,7 +106,7 @@ Item {
     Row {
         id: weekdays
         anchors.top: header.bottom
-        anchors.topMargin: 4
+        anchors.topMargin: Math.round(4 * Config.scale)
         anchors.left: parent.left
         anchors.right: parent.right
 
@@ -118,7 +118,7 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 text: Qt.locale().dayName(index + 1, Locale.ShortFormat)
                 color: Config.secondaryTextColor
-                font.pixelSize: 9
+                font.pixelSize: Config.microSize
             }
         }
     }
@@ -143,8 +143,8 @@ Item {
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 14
-                    height: 14
+                    width: Math.round(14 * Config.scale)
+                    height: width
                     radius: width / 2
                     color: dayCell.modelData.today ? Config.accentColor : "transparent"
                 }
@@ -153,7 +153,7 @@ Item {
                     anchors.centerIn: parent
                     text: dayCell.modelData.day > 0 ? dayCell.modelData.day : ""
                     color: dayCell.modelData.today ? "#0f0f10" : Config.textColor
-                    font.pixelSize: 9
+                    font.pixelSize: Config.microSize
                 }
             }
         }

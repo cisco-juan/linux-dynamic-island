@@ -30,8 +30,8 @@ Item {
     // ---------------------------------------------------------------- compact
     Item {
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
+        anchors.leftMargin: Math.round(10 * Config.scale)
+        anchors.rightMargin: Math.round(10 * Config.scale)
         opacity: view.expanded ? 0 : 1
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
@@ -40,10 +40,10 @@ Item {
             id: compactPathIcon
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            width: 20
-            height: 20
-            sourceSize.width: 40
-            sourceSize.height: 40
+            width: Config.notificationIconSize
+            height: width
+            sourceSize.width: width * 2
+            sourceSize.height: width * 2
             source: view.iconSource()
             fillMode: Image.PreserveAspectFit
             asynchronous: true
@@ -54,8 +54,8 @@ Item {
             id: compactThemedIcon
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            width: 20
-            height: 20
+            width: Config.notificationIconSize
+            height: width
             source: view.iconIsPath ? "" : view.iconName
             color: Config.textColor
             visible: !view.iconIsPath && view.iconName !== ""
@@ -77,7 +77,7 @@ Item {
     // --------------------------------------------------------------- expanded
     Item {
         anchors.fill: parent
-        anchors.margins: 14
+        anchors.margins: Math.round(14 * Config.scale)
         opacity: view.expanded ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
@@ -86,10 +86,10 @@ Item {
             id: pathIcon
             anchors.left: parent.left
             anchors.top: parent.top
-            width: 30
-            height: 30
-            sourceSize.width: 60
-            sourceSize.height: 60
+            width: Config.notificationLargeIconSize
+            height: width
+            sourceSize.width: width * 2
+            sourceSize.height: width * 2
             source: view.iconSource()
             fillMode: Image.PreserveAspectFit
             asynchronous: true
@@ -100,8 +100,8 @@ Item {
             id: themedIcon
             anchors.left: parent.left
             anchors.top: parent.top
-            width: 30
-            height: 30
+            width: Config.notificationLargeIconSize
+            height: width
             source: view.iconIsPath ? "" : view.iconName
             color: Config.textColor
             visible: !view.iconIsPath && view.iconName !== ""
@@ -109,7 +109,7 @@ Item {
 
         Column {
             anchors.left: (view.iconIsPath || view.iconName !== "") ? themedIcon.right : parent.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: Math.round(12 * Config.scale)
             anchors.right: parent.right
             anchors.top: parent.top
             spacing: 3

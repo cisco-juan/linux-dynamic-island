@@ -1,4 +1,4 @@
-QT += qml dbus
+QT += qml gui dbus
 CONFIG += plugin c++17
 TEMPLATE = lib
 TARGET = islandplugin
@@ -9,6 +9,7 @@ DESTDIR = $$PWD
 
 SOURCES += \
     island_plugin.cpp \
+    islandconfig.cpp \
     mediacontroller.cpp \
     notificationmonitor.cpp \
     volumecontrol.cpp \
@@ -17,6 +18,7 @@ SOURCES += \
 
 HEADERS += \
     island_plugin.h \
+    islandconfig.h \
     mediacontroller.h \
     notificationmonitor.h \
     volumecontrol.h \

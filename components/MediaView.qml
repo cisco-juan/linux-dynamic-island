@@ -36,8 +36,8 @@ Item {
     // ---------------------------------------------------------------- compact
     Item {
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
+        anchors.leftMargin: Math.round(10 * Config.scale)
+        anchors.rightMargin: Math.round(10 * Config.scale)
         opacity: view.expanded ? 0 : 1
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
@@ -46,10 +46,10 @@ Item {
             id: compactArt
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            width: 22
-            height: 22
-            sourceSize.width: 44
-            sourceSize.height: 44
+            width: Config.compactArtSize
+            height: width
+            sourceSize.width: width * 2
+            sourceSize.height: width * 2
             source: view.artSource(view.media ? view.media.albumArt : "")
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
@@ -64,8 +64,8 @@ Item {
 
             Kirigami.Icon {
                 anchors.centerIn: parent
-                width: 14
-                height: 14
+                width: Math.round(14 * Config.scale)
+                height: width
                 source: "audio-x-generic"
                 color: Config.secondaryTextColor
             }
@@ -117,7 +117,7 @@ Item {
     // --------------------------------------------------------------- expanded
     Item {
         anchors.fill: parent
-        anchors.margins: 16
+        anchors.margins: Config.contentMargin
         opacity: view.expanded ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
@@ -126,10 +126,10 @@ Item {
             id: art
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            width: 96
-            height: 96
-            sourceSize.width: 192
-            sourceSize.height: 192
+            width: Config.expandedArtSize
+            height: width
+            sourceSize.width: width * 2
+            sourceSize.height: width * 2
             source: view.artSource(view.media ? view.media.albumArt : "")
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
@@ -144,8 +144,8 @@ Item {
 
             Kirigami.Icon {
                 anchors.centerIn: parent
-                width: 40
-                height: 40
+                width: Math.round(40 * Config.scale)
+                height: width
                 source: "audio-x-generic"
                 color: Config.secondaryTextColor
             }
@@ -153,10 +153,10 @@ Item {
 
         Column {
             anchors.left: art.right
-            anchors.leftMargin: 16
+            anchors.leftMargin: Config.contentMargin
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 7
+            spacing: Math.round(7 * Config.scale)
 
             Text {
                 width: parent.width
@@ -206,7 +206,7 @@ Item {
                     anchors.topMargin: 1
                     text: view.formatTime(view.media ? view.media.position : 0)
                     color: Config.secondaryTextColor
-                    font.pixelSize: 9
+                    font.pixelSize: Config.microSize
                 }
 
                 Text {
@@ -215,7 +215,7 @@ Item {
                     anchors.topMargin: 1
                     text: view.formatTime(view.media ? view.media.duration : 0)
                     color: Config.secondaryTextColor
-                    font.pixelSize: 9
+                    font.pixelSize: Config.microSize
                 }
             }
 

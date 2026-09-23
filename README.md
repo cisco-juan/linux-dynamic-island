@@ -73,6 +73,7 @@ is available.
 | `media` | An MPRIS player is available with a non-empty title |
 | `calendar` | Always (current-month grid, today circled) |
 | `settings` | At least one of its backends is available (see below) — placed after `calendar` |
+| `customize` | Always — placed after `settings`, before `notification`. Configures the island itself |
 | `notification` | A notification is active |
 
 A notification arrival forces the `notification` page and auto-expands;
@@ -105,34 +106,99 @@ brightness keys stay in sync, and bluetooth subscribes to the adapter's
 `PropertiesChanged`. While a slider or toggle is pressed the card will not
 collapse (`Island.interacting`).
 
+### Customize page
+
+The `customize` page configures the island itself. It lays its rows out in two
+columns so the card stays compact, and every change is applied **live**: the
+island resizes, moves, fades or re-times as you drag. Like the settings page,
+the card will not collapse while a control is pressed (`Island.interacting`).
+
+| Row | Control | Range / options | Default |
+|-----|---------|-----------------|---------|
+| Alignment | Cycle | `Left` / `Center` / `Right` | `Center` |
+| Top offset | Slider | 0–40 px | `6` |
+| Scale | Slider | 75–150 % | `100 %` |
+| Opacity | Slider | 50–100 % | `92 %` |
+| Animation | Slider | 0–600 ms (`Off` at 0) | `300 ms` |
+| Easing | Cycle | `Back` / `Cubic` / `Quad` | `Back` |
+| Screen | Cycle | `Default` → `Active` → each connected screen name | `Default` |
+| Reset | Button | Restore every default above | — |
+
+- **Alignment** picks which screen edge the pill is pinned to. `Left` and
+  `Right` anchor to that edge with no margin; `Center` leaves the horizontal
+  axis unanchored, which KWin centers.
+- **Scale** multiplies every size and font size; the window, the card and the
+  text grow together.
+- **Animation** `0` disables the size morph and the content cross-fades; the
+  island still resizes, just instantly.
+- **Screen** selects the monitor. `Default` leaves the surface unpinned, so the
+  compositor places it exactly as before the customize page existed; `Active`
+  asks the compositor to place the surface on the focused screen
+  (`wantsToBeOnActiveScreen`); a screen name pins it to that monitor. If the
+  chosen monitor is disconnected, the island falls back to the primary one.
+
 ## Details
 
 | Topic | Decision |
 |-------|----------|
 | Windowing | `zwlr_layer_shell_v1` via `org.kde.layershell`; overlay layer, `AnchorTop`, no focus, exclusion zone 0 |
-| Placement | KWin centers the unanchored axis, so the pill stays top-center at any width |
-| Vertical offset | Transparent internal padding (`Config.topPadding`). Layer-shell `margins` is writable (`setMargins`), but QML cannot construct a `QMargins` value, so the property is unusable from QML |
+| Placement | The horizontal anchors follow the customize page's alignment (`Top\|Left` / `Top` / `Top\|Right`); KWin centers the unanchored axis, so `Center` keeps the pill top-center at any width |
+| Screen | `LayerShell.Window.screen` is bound to `IslandConfig.targetScreen` (`null` for the `default` mode, so the compositor chooses the output); `wantsToBeOnActiveScreen` is set for the `active` mode. Verified on KWin 6.7: a named screen pins the island, and `active` follows the compositor's active output |
+| Vertical offset | Transparent internal padding (`Config.topPadding`, from `topOffset`). Layer-shell `margins` is writable (`setMargins`), but QML cannot construct a `QMargins` value, so the property is unusable from QML |
+| Settings | The `IslandConfig` C++ singleton persists to `~/.config/dynamic-island/config.ini` via `QSettings` (debounced); `Config.qml` is a read-only projection of it |
 | Notifications | `dbus-monitor` subprocess observing `org.freedesktop.Notifications` (passive, never replies) |
 | Media | MPRIS over `QDBus`; `PropertiesChanged` subscription + 1 s `Position` poll |
 | D-Bus in QML | No QtDBus QML module exists, so D-Bus lives in the C++ plugin (`imports/Island`) |
-| Animations | Window `width`/`height` with `OutBack`; content cross-fades at ~150 ms |
+| Animations | Window `width`/`height` with the configured easing (`OutBack` / `OutCubic` / `OutQuad`) and duration; content cross-fades at up to 150 ms. Both follow the customize page's animation knob (`0` disables them) |
 
 ## Configuration
 
-All knobs live in `Config.qml` (a QML singleton). The most useful ones:
+User settings live in a persisted config file, written by the `IslandConfig`
+C++ singleton (registered as the `IslandConfig` QML singleton):
 
-| Property | Default | Purpose |
-|----------|---------|---------|
-| `topPadding` | `6` | Transparent gap above the pill; increase to clear a top panel |
-| `idleWidth` / `idleHeight` | `180` / `32` | Idle pill size |
-| `mediaCompactWidth` / `mediaExpandedHeight` | `240` / `164` | Media pill sizes |
-| `notificationCompactWidth` / `notificationExpandedHeight` | `340` / `116` | Notification pill sizes |
+```
+~/.config/dynamic-island/config.ini
+```
+
+The file is created lazily: it appears only after the first change on the
+customize page (or a programmatic `IslandConfig` write), is written through
+`QSettings` with a ~300 ms debounce so a slider drag produces one write on
+release, and is never placed inside the repository. Editing it while the island
+is stopped is supported; unknown/missing keys fall back to the defaults below.
+
+| Key | Values | Default |
+|-----|--------|---------|
+| `alignment` | `left` / `center` / `right` | `center` |
+| `topOffset` | 0–40 px | `6` |
+| `scale` | 0.75–1.5 | `1.0` |
+| `opacity` | 0.5–1.0 | `0.92` |
+| `animationDuration` | 0–600 ms (0 = animations off) | `300` |
+| `easing` | `back` / `cubic` / `quad` | `back` |
+| `screenMode` | `default` / `active` / a screen name (`HDMI-A-1`, `eDP-1`, …) | `default` |
+
+A legacy stored value of `primary` is read back as `default`, so an existing
+`config.ini` cannot keep the island pinned to Qt's primary screen.
+
+`Config.qml` is the single place the components read from, but it is now a
+read-only projection: every geometry value is derived from `IslandConfig`
+(multiplied by `scale`), the vertical offset comes from `topOffset`, the fill
+color composes `opacity`, the size morph duration/easing come from
+`animationDuration`/`easing`, and the card sizes are the base values below
+scaled. The most useful base values:
+
+| Property | Base default | Purpose |
+|----------|--------------|---------|
+| `topPadding` | `6` (from `topOffset`) | Transparent gap above the pill; increase to clear a top panel |
+| `idleWidth` / `idleHeight` | `180` / `32` | Idle pill size (× `scale`) |
+| `mediaCompactWidth` / `mediaExpandedHeight` | `240` / `164` | Media pill sizes (× `scale`) |
+| `notificationCompactWidth` / `notificationExpandedHeight` | `340` / `116` | Notification pill sizes (× `scale`) |
+| `customizeWidth` / `customizeHeight` | `470` / `222` | Customize page card size (× `scale`) |
 | `expandedRadius` | `14` | Corner radius of the expanded card. The compact pill always keeps `height / 2` (a full pill); the expanded card uses this small radius so it reads as a square-ish card. The radius animates together with the size morph |
-| `sizeDuration` | `300` | Pill resize animation (ms) |
-| `fadeDuration` | `150` | Content cross-fade (ms) |
+| `sizeDuration` | from `animationDuration` | Pill resize animation (ms) |
+| `fadeDuration` | `min(150, animationDuration)` | Content cross-fade (ms); `0` when animations are off |
 | `notificationTimeout` | `4000` | How long a notification stays expanded (ms) |
 | `mediaExpandTimeout` | `3000` | How long media expands on playback start (ms) |
-| `pillColor` | `#eb0f0f10` | Pill fill (`#0f0f10` at ~0.92 alpha) |
+| `pillColor` | `#0f0f10` × `opacity` | Pill fill; `#eb0f0f10` at the default `0.92` opacity |
 
 ## Dev/test hook
 
@@ -143,7 +209,7 @@ aid for screenshot verification of the expanded card.
 | Variable | Effect |
 |----------|--------|
 | `ISLAND_DEBUG_EXPAND=1` | Start expanded |
-| `ISLAND_DEBUG_PAGE=<media\|calendar\|settings\|notification>` | Force the initial page. For `notification`, a placeholder notification is seeded when none exists so the page renders |
+| `ISLAND_DEBUG_PAGE=<media\|calendar\|settings\|customize\|notification>` | Force the initial page. For `notification`, a placeholder notification is seeded when none exists so the page renders |
 
 ```bash
 # Capture a specific page (e.g. for visual review)
@@ -170,11 +236,13 @@ dynamic-island/
 │   ├── MediaView.qml          # art, title/artist, progress, transport controls
 │   ├── CalendarView.qml       # locale-aware current-month grid, today circled
 │   ├── SettingsView.qml       # volume/brightness sliders + bluetooth toggle
+│   ├── CustomizeView.qml      # alignment/scale/opacity/timing/screen controls
 │   ├── NotificationView.qml   # app icon, app name, summary, body
 │   └── IconButton.qml
 └── imports/Island/            # C++ QML plugin, module "Island"
     ├── Island.pro
-    ├── island_plugin.cpp/.h         # registers the types + the `Debug` singleton
+    ├── island_plugin.cpp/.h         # registers the types + the `Debug`/`IslandConfig` singletons
+    ├── islandconfig.cpp/.h          # persisted settings (QSettings) + target screen resolution
     ├── mediacontroller.cpp/.h       # MPRIS over QDBus
     ├── notificationmonitor.cpp/.h   # dbus-monitor subprocess + parser
     ├── volumecontrol.cpp/.h         # WirePlumber `wpctl` volume/mute
@@ -193,6 +261,8 @@ dynamic-island/
 | Notifications do not expand | The notification daemon must be running (`plasmashell`). Verify capture manually with `dbus-monitor "interface='org.freedesktop.Notifications'"`. |
 | Media view stays idle | Check for a player: `busctl --user list | grep -i mpris`. Only players exposing MPRIS are visible. |
 | Plugin fails to load | Rebuild it: `cd imports/Island && qmake6 && make -j$(nproc)`. |
+| Island is on the wrong monitor | Set the `Screen` row on the customize page (or `screenMode` in `~/.config/dynamic-island/config.ini`). `Default` lets the compositor choose (the behavior before the customize page); pick the monitor by name to pin it explicitly. |
+| Settings will not reset | Delete `~/.config/dynamic-island/config.ini` (or press `Reset` on the customize page) to return to the defaults. |
 
 ## Verifying
 
@@ -215,6 +285,13 @@ ISLAND_DEBUG_EXPAND=1 ISLAND_DEBUG_PAGE=settings ./run.sh &
 sleep 2.5 && spectacle -b -n -f -o /tmp/opencode/island-settings.png
 kill %1
 
+ISLAND_DEBUG_EXPAND=1 ISLAND_DEBUG_PAGE=customize ./run.sh &
+sleep 2.5 && spectacle -b -n -f -o /tmp/opencode/island-customize.png
+kill %1
+
+# Start from clean defaults (drops the persisted settings)
+rm -f ~/.config/dynamic-island/config.ini
+
 # Shell syntax
 bash -n run.sh install.sh
 ```
@@ -225,9 +302,10 @@ bash -n run.sh install.sh
 - [ ] `notify-send -a "Dynamic Island" "Test" "Hello island"` expands the pill.
 - [ ] Playing media in a browser/player shows title, artist and progress.
 - [ ] Play/pause/next/previous buttons control the active player.
+- [ ] The `customize` page changes alignment, scale, opacity, timing and screen live, and the values survive a restart (`~/.config/dynamic-island/config.ini`).
 - [ ] `./install.sh` writes the autostart entry; `./install.sh --uninstall` removes it.
 
 ## Out of scope (v1)
 
-Click-to-invoke notification actions, notification stacking/history, a config
-file, and packaging are intentionally deferred.
+Click-to-invoke notification actions, notification stacking/history, and
+packaging are intentionally deferred.

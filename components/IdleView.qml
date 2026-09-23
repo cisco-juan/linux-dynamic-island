@@ -7,13 +7,13 @@ Item {
 
     Item {
         anchors.centerIn: parent
-        width: 10
-        height: 10
+        width: Math.round(10 * Config.scale)
+        height: width
 
         Rectangle {
             anchors.centerIn: parent
-            width: 7
-            height: 7
+            width: Math.round(7 * Config.scale)
+            height: width
             radius: width / 2
             color: Config.textColor
             opacity: 0.85

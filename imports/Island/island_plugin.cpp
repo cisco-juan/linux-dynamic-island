@@ -2,12 +2,14 @@
 
 #include "bluetoothcontrol.h"
 #include "brightnesscontrol.h"
+#include "islandconfig.h"
 #include "mediacontroller.h"
 #include "notificationmonitor.h"
 #include "volumecontrol.h"
 
 #include <QJSEngine>
 #include <QJSValue>
+#include <QQmlEngine>
 #include <qqml.h>
 
 namespace {
@@ -26,6 +28,18 @@ QJSValue makeDebugFlags(QQmlEngine *, QJSEngine *engine)
     return flags;
 }
 
+// Provider for the `IslandConfig` singleton. It hands out the process-wide
+// instance but is invoked on the engine's thread, so the QObject is created
+// there (a static created at module-load time may live on a different thread).
+// The instance outlives the engine, so QML must never delete it.
+QObject *makeIslandConfig(QQmlEngine *engine, QJSEngine *)
+{
+    Q_UNUSED(engine)
+    IslandConfig *config = IslandConfig::instance();
+    QQmlEngine::setObjectOwnership(config, QQmlEngine::CppOwnership);
+    return config;
+}
+
 } // namespace
 
 void IslandPlugin::registerTypes(const char *uri)
@@ -36,4 +50,5 @@ void IslandPlugin::registerTypes(const char *uri)
     qmlRegisterType<BrightnessControl>(uri, 1, 0, "BrightnessControl");
     qmlRegisterType<BluetoothControl>(uri, 1, 0, "BluetoothControl");
     qmlRegisterSingletonType(uri, 1, 0, "Debug", makeDebugFlags);
+    qmlRegisterSingletonType<IslandConfig>(uri, 1, 0, "IslandConfig", makeIslandConfig);
 }

@@ -23,9 +23,9 @@ Rectangle {
     property var bluetooth
 
     readonly property bool hovered: hoverHandler.hovered
-    // Forwarded from the settings page so main.qml can keep the card expanded
-    // while the user drags a slider or presses a toggle.
-    property bool interacting: settingsView.interacting
+    // Forwarded from the settings and customize pages so main.qml can keep the
+    // card expanded while the user drags a slider or presses a control.
+    property bool interacting: settingsView.interacting || customizeView.interacting
     // Navigation is only meaningful while expanded with somewhere to go.
     readonly property bool showNavigation: expanded && pages.length > 1
 
@@ -98,6 +98,14 @@ Rectangle {
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
     }
 
+    CustomizeView {
+        id: customizeView
+        anchors.fill: parent
+        opacity: pill.activeView === "customize" ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
+    }
+
     NotificationView {
         anchors.fill: parent
         notification: pill.notification
@@ -113,8 +121,8 @@ Rectangle {
         anchors.left: parent.left
         anchors.leftMargin: 0
         anchors.verticalCenter: parent.verticalCenter
-        width: 22
-        height: 40
+        width: Config.navButtonWidth
+        height: Config.navButtonHeight
         visible: pill.showNavigation
         opacity: pill.showNavigation ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
@@ -128,8 +136,8 @@ Rectangle {
 
         Kirigami.Icon {
             anchors.centerIn: parent
-            width: 16
-            height: 16
+            width: Config.navIconSize
+            height: Config.navIconSize
             source: "arrow-left"
             color: Config.textColor
         }
@@ -150,8 +158,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: 0
         anchors.verticalCenter: parent.verticalCenter
-        width: 22
-        height: 40
+        width: Config.navButtonWidth
+        height: Config.navButtonHeight
         visible: pill.showNavigation
         opacity: pill.showNavigation ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
@@ -165,8 +173,8 @@ Rectangle {
 
         Kirigami.Icon {
             anchors.centerIn: parent
-            width: 16
-            height: 16
+            width: Config.navIconSize
+            height: Config.navIconSize
             source: "arrow-right"
             color: Config.textColor
         }
@@ -185,8 +193,8 @@ Rectangle {
         id: pageDots
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 6
-        spacing: 5
+        anchors.bottomMargin: Math.round(6 * Config.scale)
+        spacing: Math.round(5 * Config.scale)
         visible: pill.showNavigation
         opacity: pill.showNavigation ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
@@ -195,7 +203,8 @@ Rectangle {
             model: pill.pages
             delegate: Rectangle {
                 required property string modelData
-                width: modelData === pill.page ? 6 : 5
+                width: modelData === pill.page ? Math.round(6 * Config.scale)
+                                               : Math.round(5 * Config.scale)
                 height: width
                 radius: width / 2
                 color: modelData === pill.page ? Config.accentColor : Config.progressTrackColor

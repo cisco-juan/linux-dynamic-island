@@ -39,7 +39,7 @@ Item {
         text: control.glyph
         visible: control.icon === ""
         color: Config.textColor
-        font.pixelSize: 15
+        font.pixelSize: Math.max(1, Math.round(15 * Config.scale))
     }
 
     HoverHandler {
