@@ -10,12 +10,18 @@ DESTDIR = $$PWD
 SOURCES += \
     island_plugin.cpp \
     mediacontroller.cpp \
-    notificationmonitor.cpp
+    notificationmonitor.cpp \
+    volumecontrol.cpp \
+    brightnesscontrol.cpp \
+    bluetoothcontrol.cpp
 
 HEADERS += \
     island_plugin.h \
     mediacontroller.h \
-    notificationmonitor.h
+    notificationmonitor.h \
+    volumecontrol.h \
+    brightnesscontrol.h \
+    bluetoothcontrol.h
 
 # Keep the plugin loadable from QML without installing anything system-wide.
 target.path = $$PWD

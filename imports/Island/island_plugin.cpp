@@ -1,7 +1,10 @@
 #include "island_plugin.h"
 
+#include "bluetoothcontrol.h"
+#include "brightnesscontrol.h"
 #include "mediacontroller.h"
 #include "notificationmonitor.h"
+#include "volumecontrol.h"
 
 #include <QJSEngine>
 #include <QJSValue>
@@ -29,5 +32,8 @@ void IslandPlugin::registerTypes(const char *uri)
 {
     qmlRegisterType<MediaController>(uri, 1, 0, "MediaController");
     qmlRegisterType<NotificationMonitor>(uri, 1, 0, "NotificationMonitor");
+    qmlRegisterType<VolumeControl>(uri, 1, 0, "VolumeControl");
+    qmlRegisterType<BrightnessControl>(uri, 1, 0, "BrightnessControl");
+    qmlRegisterType<BluetoothControl>(uri, 1, 0, "BluetoothControl");
     qmlRegisterSingletonType(uri, 1, 0, "Debug", makeDebugFlags);
 }

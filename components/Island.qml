@@ -18,8 +18,14 @@ Rectangle {
     property var pages: []
     property var media
     property var notification
+    property var volume
+    property var brightness
+    property var bluetooth
 
     readonly property bool hovered: hoverHandler.hovered
+    // Forwarded from the settings page so main.qml can keep the card expanded
+    // while the user drags a slider or presses a toggle.
+    property bool interacting: settingsView.interacting
     // Navigation is only meaningful while expanded with somewhere to go.
     readonly property bool showNavigation: expanded && pages.length > 1
 
@@ -77,6 +83,17 @@ Rectangle {
     CalendarView {
         anchors.fill: parent
         opacity: pill.activeView === "calendar" ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
+    }
+
+    SettingsView {
+        id: settingsView
+        anchors.fill: parent
+        volume: pill.volume
+        brightness: pill.brightness
+        bluetooth: pill.bluetooth
+        opacity: pill.activeView === "settings" ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
     }

@@ -17,16 +17,23 @@ Window {
     property bool expanded: false
     property var currentNotification: null
 
-    // Page shown by the expanded card: "media" | "calendar" | "notification".
+    // Page shown by the expanded card: "media" | "calendar" | "settings" | "notification".
     property string page: "calendar"
 
-    // Pages available right now. Calendar is always present; media and
-    // notification only while they have something to show.
+    // The settings page is offered only while at least one of its backends
+    // (volume, brightness, bluetooth) is available.
+    readonly property bool settingsAvailable: volume.available || brightness.available
+                                             || bluetooth.available
+
+    // Pages available right now. Calendar is always present; the others only
+    // while they have something to show.
     readonly property var pages: {
         var list = []
         if (media.available && media.title !== "")
             list.push("media")
         list.push("calendar")
+        if (root.settingsAvailable)
+            list.push("settings")
         if (root.currentNotification !== null)
             list.push("notification")
         return list
@@ -75,6 +82,23 @@ Window {
         id: notifier
     }
 
+    // Settings-page backends. Each one polls/re-reads only while the settings
+    // page is visible in an expanded card.
+    VolumeControl {
+        id: volume
+        active: root.page === "settings" && root.expanded
+    }
+
+    BrightnessControl {
+        id: brightness
+        active: root.page === "settings" && root.expanded
+    }
+
+    BluetoothControl {
+        id: bluetooth
+        active: root.page === "settings" && root.expanded
+    }
+
     Island {
         id: island
         mode: root.mode
@@ -83,6 +107,9 @@ Window {
         pages: root.pages
         media: media
         notification: root.currentNotification
+        volume: volume
+        brightness: brightness
+        bluetooth: bluetooth
         onToggleRequested: root.toggle()
         onNextPageRequested: root.cyclePage(1)
         onPreviousPageRequested: root.cyclePage(-1)
@@ -142,7 +169,8 @@ Window {
     // `notification`, seed a placeholder when no real notification exists so
     // the page has something to render.
     function forceDebugPage(id) {
-        if (id !== "media" && id !== "calendar" && id !== "notification")
+        if (id !== "media" && id !== "calendar" && id !== "settings"
+                && id !== "notification")
             return
         if (id === "notification" && root.currentNotification === null) {
             root.currentNotification = {
@@ -160,7 +188,9 @@ Window {
     Timer {
         id: collapseTimer
         onTriggered: {
-            if (island.hovered)
+            // Never collapse mid-interaction: the user may be dragging a
+            // slider on the settings page.
+            if (island.hovered || island.interacting)
                 return
             root.expanded = false
             root.settle()
@@ -176,11 +206,18 @@ Window {
                     root.page = root.defaultPage()
                     root.expanded = true
                 }
-            } else {
-                if (root.expanded) {
-                    root.expanded = false
-                    root.settle()
-                }
+            } else if (root.expanded && !island.interacting) {
+                root.expanded = false
+                root.settle()
+            }
+        }
+
+        // A slider drag released with the pointer outside the pill produces no
+        // hover-out event, so collapse when the interaction ends instead.
+        function onInteractingChanged() {
+            if (root.expanded && !island.interacting && !island.hovered) {
+                root.expanded = false
+                root.settle()
             }
         }
     }

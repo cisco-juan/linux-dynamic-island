@@ -2,8 +2,9 @@
 
 An Apple-style **Dynamic Island for KDE Plasma 6 on Wayland**: a standalone,
 always-on-top overlay with one compact pill anchored to the top-center of the
-screen that morphs in place to show notifications, media playback and a
-calendar, then collapses back automatically. It is a layer-shell surface, not a
+screen that morphs in place to show notifications, media playback, a calendar
+and system settings (volume, brightness, bluetooth), then collapses back
+automatically. It is a layer-shell surface, not a
 Plasma applet, so it never steals focus and leaves no taskbar entry.
 
 <div align="center">
@@ -71,6 +72,7 @@ is available.
 |------|------------|
 | `media` | An MPRIS player is available with a non-empty title |
 | `calendar` | Always (current-month grid, today circled) |
+| `settings` | At least one of its backends is available (see below) — placed after `calendar` |
 | `notification` | A notification is active |
 
 A notification arrival forces the `notification` page and auto-expands;
@@ -78,6 +80,30 @@ hover-expanding shows the default page (notification if active, else media if
 available, else calendar); after an auto-collapse the card settles back to that
 default. Chevron clicks are consumed, so clicking anywhere else on the card
 still toggles collapse.
+
+### Settings page
+
+The `settings` page shows three rows — volume, brightness and bluetooth — with
+hand-rolled sliders and a pill toggle that match the dark card. Each row is
+hidden when its backend is unavailable, and the page itself is absent from the
+rotation when none of them can be reached, so the island degrades quietly on
+machines without an audio server, a backlight or a bluetooth adapter. Volume and
+brightness are applied to the system the moment a slider is released (the value
+label tracks the handle live); the bluetooth toggle powers the adapter on or
+off, and its status text reports the connected-device count (`On · 1 connected`,
+`On`, or `Off`).
+
+| Row | Icon | Backend |
+|-----|------|---------|
+| Volume + mute | `audio-volume-high` / `audio-volume-muted` | WirePlumber via `wpctl` (`get-volume`, `set-volume`, `set-mute` on `@DEFAULT_AUDIO_SINK@`) |
+| Brightness | `brightness-high` | PowerDevil `org.kde.Solid.PowerManagement.Actions.BrightnessControl` (`brightness`/`brightnessMax`/`brightnessMin`, `setBrightness`) |
+| Bluetooth | `bluetooth` | BlueZ on the system bus: `GetManagedObjects` to find the adapter and count connected devices, `Properties.Set` on `org.bluez.Adapter1` `Powered` to toggle |
+
+The three backends poll only while the settings page is visible in an expanded
+card (`active` property); brightness also subscribes to `brightnessChanged` so
+brightness keys stay in sync, and bluetooth subscribes to the adapter's
+`PropertiesChanged`. While a slider or toggle is pressed the card will not
+collapse (`Island.interacting`).
 
 ## Details
 
@@ -117,7 +143,7 @@ aid for screenshot verification of the expanded card.
 | Variable | Effect |
 |----------|--------|
 | `ISLAND_DEBUG_EXPAND=1` | Start expanded |
-| `ISLAND_DEBUG_PAGE=<media\|calendar\|notification>` | Force the initial page. For `notification`, a placeholder notification is seeded when none exists so the page renders |
+| `ISLAND_DEBUG_PAGE=<media\|calendar\|settings\|notification>` | Force the initial page. For `notification`, a placeholder notification is seeded when none exists so the page renders |
 
 ```bash
 # Capture a specific page (e.g. for visual review)
@@ -143,6 +169,7 @@ dynamic-island/
 │   ├── IdleView.qml
 │   ├── MediaView.qml          # art, title/artist, progress, transport controls
 │   ├── CalendarView.qml       # locale-aware current-month grid, today circled
+│   ├── SettingsView.qml       # volume/brightness sliders + bluetooth toggle
 │   ├── NotificationView.qml   # app icon, app name, summary, body
 │   └── IconButton.qml
 └── imports/Island/            # C++ QML plugin, module "Island"
@@ -150,6 +177,9 @@ dynamic-island/
     ├── island_plugin.cpp/.h         # registers the types + the `Debug` singleton
     ├── mediacontroller.cpp/.h       # MPRIS over QDBus
     ├── notificationmonitor.cpp/.h   # dbus-monitor subprocess + parser
+    ├── volumecontrol.cpp/.h         # WirePlumber `wpctl` volume/mute
+    ├── brightnesscontrol.cpp/.h     # PowerDevil backlight brightness
+    ├── bluetoothcontrol.cpp/.h      # BlueZ adapter power + connected devices
     └── qmldir
 ```
 
@@ -181,6 +211,10 @@ ISLAND_DEBUG_EXPAND=1 ISLAND_DEBUG_PAGE=calendar ./run.sh &
 sleep 2.5 && spectacle -b -n -f -o /tmp/opencode/island-calendar.png
 kill %1
 
+ISLAND_DEBUG_EXPAND=1 ISLAND_DEBUG_PAGE=settings ./run.sh &
+sleep 2.5 && spectacle -b -n -f -o /tmp/opencode/island-settings.png
+kill %1
+
 # Shell syntax
 bash -n run.sh install.sh
 ```
@@ -195,5 +229,5 @@ bash -n run.sh install.sh
 
 ## Out of scope (v1)
 
-Volume/brightness HUD, click-to-invoke notification actions, notification
-stacking/history, a config file, and packaging are intentionally deferred.
+Click-to-invoke notification actions, notification stacking/history, a config
+file, and packaging are intentionally deferred.
