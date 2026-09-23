@@ -21,6 +21,10 @@ Rectangle {
     property var volume
     property var brightness
     property var bluetooth
+    // Custom-widget page: the id of the widget to render and the context object
+    // assigned to the widget's `island` property.
+    property string widget: ""
+    property var widgetBridge: null
     property string selectedDate: ""
 
     readonly property bool hovered: hoverHandler.hovered
@@ -132,6 +136,17 @@ Rectangle {
         notification: pill.notification
         expanded: pill.expanded && pill.activeView === "notification"
         opacity: pill.activeView === "notification" ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
+    }
+
+    WidgetView {
+        id: widgetView
+        anchors.fill: parent
+        widgetId: pill.widget
+        bridge: pill.widgetBridge
+        active: pill.expanded && pill.activeView === "widget"
+        opacity: pill.activeView === "widget" ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
     }

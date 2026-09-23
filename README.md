@@ -75,6 +75,7 @@ is available.
 | `agenda` | Always — the events of the selected day, with an inline create form |
 | `settings` | At least one of its backends is available (see below) — placed after `agenda` |
 | `customize` | Always — placed after `settings`, before `notification`. Configures the island itself |
+| `widget` | A custom widget is shown (`ShowWidget`, see [Extend it](#extend-it)) |
 | `notification` | A notification is active |
 
 A notification arrival forces the `notification` page and auto-expands;
@@ -203,6 +204,33 @@ the card will not collapse while a control is pressed (`Island.interacting`).
   asks the compositor to place the surface on the focused screen
   (`wantsToBeOnActiveScreen`); a screen name pins it to that monitor. If the
   chosen monitor is disconnected, the island falls back to the primary one.
+
+## Extend it
+
+The island is scriptable and extensible:
+
+- **[D-Bus API](docs/api.md)** — other applications can show and dismiss cards,
+  expand/collapse, switch pages, show/hide widgets and read the live status over
+  the session bus (`io.github.cisco_juan.DynamicIsland`, path `/Island`).
+  Ready-made clients: [`examples/dbus/`](examples/dbus).
+- **[Custom widgets](docs/widgets.md)** — drop a `widget.qml` (plus an optional
+  `metadata.json`) into `~/.local/share/dynamic-island/widgets/<id>/` and show it
+  with `ShowWidget`. Examples: [`examples/widgets/`](examples/widgets).
+
+```bash
+IFACE=io.github.cisco_juan.DynamicIsland
+
+# Show a card
+busctl --user call $IFACE /Island $IFACE ShowCard \
+  ssssii "My App" "Build finished" "All tests passed." "dialog-information" 1 4000
+
+# List and show the bundled example widget
+busctl --user call $IFACE /Island $IFACE ListWidgets
+busctl --user call $IFACE /Island $IFACE ShowWidget s hello-world
+```
+
+Custom widgets are arbitrary QML executed with the island's privileges: install
+only widgets you trust.
 
 ## Screenshots
 
@@ -343,16 +371,23 @@ dynamic-island/
 │   ├── AgendaView.qml         # selected-day event list + inline create form
 │   ├── SettingsView.qml       # volume/brightness sliders + bluetooth toggle
 │   ├── CustomizeView.qml      # alignment/scale/opacity/timing/screen controls
+│   ├── WidgetView.qml         # loads a custom widget and hands it the `island` context
 │   ├── NotificationView.qml   # app icon, app name, summary, body
 │   └── IconButton.qml
 ├── tools/                     # README screenshot tooling
 │   ├── screenshots.qml        # offscreen harness: real components + mock data
 │   └── make-screenshots.sh    # runs the harness + builds overview.png
 ├── docs/
+│   ├── api.md                 # D-Bus API reference (bus name, methods, signals)
+│   ├── widgets.md             # custom-widget authoring guide
 │   └── screenshots/           # generated README screenshots (2x PNGs)
+├── examples/
+│   ├── widgets/               # hello-world and clock example widgets
+│   └── dbus/                  # busctl client scripts (show card, list, status)
 └── imports/Island/            # C++ QML plugin, module "Island"
     ├── Island.pro
-    ├── island_plugin.cpp/.h         # registers the types + the `Debug`/`IslandConfig` singletons
+    ├── island_plugin.cpp/.h         # registers the types + singletons
+    ├── islandapi.cpp/.h             # D-Bus service + custom-widget registry
     ├── islandconfig.cpp/.h          # persisted settings (QSettings) + target screen resolution
     ├── mediacontroller.cpp/.h       # MPRIS over QDBus
     ├── notificationmonitor.cpp/.h   # dbus-monitor subprocess + parser

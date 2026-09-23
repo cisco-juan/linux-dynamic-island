@@ -54,6 +54,12 @@ QtObject {
     readonly property int agendaWidth: Math.round(420 * scale)
     readonly property int agendaHeight: Math.round(220 * scale)
 
+    // Custom-widget page card. A third-party widget is rendered inside it; the
+    // content area is this size minus two `contentMargin` insets (reported to
+    // the widget as `cardWidth` / `cardHeight`).
+    readonly property int widgetWidth: Math.round(420 * scale)
+    readonly property int widgetHeight: Math.round(220 * scale)
+
     // Corner radius of the expanded card. The compact pill always keeps
     // `height / 2` (a full pill); the expanded card uses this small radius so
     // it reads as a square-ish card instead of an oversized pill.

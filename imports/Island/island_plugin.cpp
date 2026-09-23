@@ -4,6 +4,7 @@
 #include "brightnesscontrol.h"
 #include "eventnotifier.h"
 #include "eventstore.h"
+#include "islandapi.h"
 #include "islandconfig.h"
 #include "mediacontroller.h"
 #include "notificationmonitor.h"
@@ -61,6 +62,17 @@ QObject *makeEventNotifier(QQmlEngine *engine, QJSEngine *)
     return notifier;
 }
 
+// Provider for the D-Bus service singleton. Creating it registers the object
+// and claims the bus name (or degrades gracefully); it is referenced by
+// main.qml at startup, so the service is up as soon as the island runs.
+QObject *makeIslandApi(QQmlEngine *engine, QJSEngine *)
+{
+    Q_UNUSED(engine)
+    IslandApi *api = IslandApi::instance();
+    QQmlEngine::setObjectOwnership(api, QQmlEngine::CppOwnership);
+    return api;
+}
+
 } // namespace
 
 void IslandPlugin::registerTypes(const char *uri)
@@ -74,4 +86,5 @@ void IslandPlugin::registerTypes(const char *uri)
     qmlRegisterSingletonType<IslandConfig>(uri, 1, 0, "IslandConfig", makeIslandConfig);
     qmlRegisterSingletonType<EventStore>(uri, 1, 0, "EventStore", makeEventStore);
     qmlRegisterSingletonType<EventNotifier>(uri, 1, 0, "EventNotifier", makeEventNotifier);
+    qmlRegisterSingletonType<IslandApi>(uri, 1, 0, "IslandApi", makeIslandApi);
 }

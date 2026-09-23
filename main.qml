@@ -18,8 +18,13 @@ Window {
     property var currentNotification: null
 
     // Page shown by the expanded card: "media" | "calendar" | "agenda" |
-    // "settings" | "customize" | "notification".
+    // "settings" | "customize" | "widget" | "notification".
     property string page: "calendar"
+
+    // Id of the custom widget currently shown on the `widget` page ("" = none).
+    // Set through the D-Bus API (`ShowWidget`) or by a widget calling
+    // `island.showCard(...)`/`dismiss()`; cleared by `HideWidget`.
+    property string widget: ""
 
     // ISO date shown by the agenda page; day clicks in the calendar move it.
     property string selectedDate: Qt.formatDate(new Date(), "yyyy-MM-dd")
@@ -40,6 +45,8 @@ Window {
         if (root.settingsAvailable)
             list.push("settings")
         list.push("customize")
+        if (root.widget !== "")
+            list.push("widget")
         if (root.currentNotification !== null)
             list.push("notification")
         return list
@@ -49,6 +56,7 @@ Window {
         if (root.expanded)
             return root.page === "customize" ? Config.customizeWidth
                  : root.page === "agenda" ? Config.agendaWidth
+                 : root.page === "widget" ? Config.widgetWidth
                                              : Config.mediaExpandedWidth
         if (mode === "notification")
             return Config.notificationCompactWidth
@@ -65,6 +73,8 @@ Window {
                 return Config.customizeHeight
             if (root.page === "agenda")
                 return Config.agendaHeight
+            if (root.page === "widget")
+                return Config.widgetHeight
             return Config.mediaExpandedHeight
         }
         if (mode === "notification")
@@ -143,6 +153,8 @@ Window {
         expanded: root.expanded
         page: root.page
         pages: root.pages
+        widget: root.widget
+        widgetBridge: widgetBridge
         selectedDate: root.selectedDate
         media: media
         notification: root.currentNotification
@@ -154,6 +166,40 @@ Window {
         onPreviousPageRequested: root.cyclePage(-1)
         onDayClicked: function(isoDate) { root.openAgenda(isoDate) }
         onDateChanged: function(isoDate) { root.selectedDate = isoDate }
+    }
+
+    // Context object handed to custom widgets (assigned to their `island`
+    // property by WidgetView). It is the widget-facing face of the island: a
+    // widget calls these functions and reads these values; it never reaches
+    // into the island's internals. Documented in docs/widgets.md.
+    QtObject {
+        id: widgetBridge
+
+        // Content area of the widget page, in logical pixels.
+        readonly property int cardWidth: Config.widgetWidth - 2 * Config.contentMargin
+        readonly property int cardHeight: Config.widgetHeight - 2 * Config.contentMargin
+        readonly property real scale: Config.scale
+        readonly property string widgetId: root.widget
+        // Theme colors, kept in sync with the island.
+        readonly property color pillColor: Config.pillColor
+        readonly property color textColor: Config.textColor
+        readonly property color accentColor: Config.accentColor
+
+        // Show an island card through the same path notifications use. The
+        // card is informational only (no return value, no id).
+        function showCard(appName, title, body, icon, urgency, timeoutMs) {
+            root.showApiCard(0, appName, title, body, icon, urgency, timeoutMs)
+        }
+        // Hide the widget and return the island to its default page.
+        function dismiss() {
+            root.hideWidget()
+        }
+        function expand() {
+            root.expandFromApi()
+        }
+        function collapse() {
+            root.collapseFromApi()
+        }
     }
 
     // While the create form is open the surface must be keyboard-active; when
@@ -178,8 +224,12 @@ Window {
     }
 
     function defaultPage() {
+        // A live card (notification or API/widget-raised) outranks the widget
+        // page: showing a card must be visible even while a widget is open.
         if (root.currentNotification !== null)
             return "notification"
+        if (root.widget !== "")
+            return "widget"
         if (media.available && media.title !== "")
             return "media"
         return "calendar"
@@ -251,19 +301,105 @@ Window {
     // org.freedesktop.Notifications so it lands in KDE's notification history.
     function showReminder(event) {
         const body = root.reminderBody(event)
-        root.currentNotification = {
+        root.replaceNotification({
             "appName": "Dynamic Island",
             "appIcon": "view-calendar",
             "summary": event.title,
             "body": body,
             "id": 0
-        }
+        })
         root.mode = "notification"
         root.page = "notification"
         root.expandBriefly(Config.notificationTimeout)
 
         if (IslandConfig.postReminders) {
             EventNotifier.post("Dynamic Island", event.title, body, "view-calendar")
+        }
+    }
+
+    // ---- D-Bus API bridge ---------------------------------------------------
+    // Every function here fulfils an `IslandApi` request using the same paths
+    // the interactive UI uses. The API never touches the UI directly; these
+    // handlers are the only place requests become state.
+
+    // Clear the tracked notification, reporting the dismissal of an API card
+    // (one whose id was allocated by `ShowCard`) exactly once.
+    function clearNotification() {
+        if (root.currentNotification !== null
+                && root.currentNotification.apiCardId > 0)
+            IslandApi.reportCardDismissed(root.currentNotification.apiCardId)
+        root.currentNotification = null
+    }
+
+    // Replace the tracked notification. The card being dropped is cleared
+    // through `clearNotification()`, so an API card reports exactly one
+    // CardDismissed before it is overwritten. A plain notification being
+    // replaced emits nothing (clearNotification only reports apiCardId > 0).
+    function replaceNotification(notification) {
+        root.clearNotification()
+        root.currentNotification = notification
+    }
+
+    // Show a card requested through the API (or by a widget). `id` is 0 for
+    // widget-originated cards, which have no API identity.
+    function showApiCard(id, appName, title, body, icon, urgency, timeoutMs) {
+        root.replaceNotification({
+            "appName": appName,
+            "appIcon": icon,
+            "summary": title,
+            "body": body,
+            // -1 marks an API card: it is never matched by the notification
+            // monitor's daemon-id close path, so only DismissCard/DismissAll
+            // (or the timeout) clear it.
+            "id": -1,
+            "apiCardId": id,
+            "urgency": urgency
+        })
+        root.mode = "notification"
+        root.page = "notification"
+        var interval = Config.notificationTimeout
+        if (timeoutMs > 0)
+            interval = Math.max(500, Math.min(timeoutMs, 60000))
+        root.expandBriefly(interval)
+        if (id > 0)
+            IslandApi.reportCardShown(id, appName, title)
+    }
+
+    function expandFromApi() {
+        root.expanded = true
+        collapseTimer.stop()
+        if (root.page === "")
+            root.page = root.defaultPage()
+    }
+
+    function collapseFromApi() {
+        root.expanded = false
+        root.settle()
+    }
+
+    function showPageFromApi(pageId) {
+        // Validate against the pages the island actually offers right now.
+        if (root.pages.indexOf(pageId) < 0)
+            return
+        root.page = pageId
+        root.expanded = true
+        collapseTimer.stop()
+    }
+
+    function showWidgetFromApi(widgetId) {
+        if (IslandApi.widgets.indexOf(widgetId) < 0)
+            return
+        root.widget = widgetId
+        root.page = "widget"
+        root.expanded = true
+        collapseTimer.stop()
+    }
+
+    function hideWidget() {
+        root.widget = ""
+        if (root.page === "widget") {
+            root.expanded = false
+            root.settle()
         }
     }
 
@@ -294,6 +430,10 @@ Window {
             // slider on the settings page.
             if (island.hovered || island.interacting)
                 return
+            // An API card that expires is dismissed for real.
+            if (root.currentNotification !== null
+                    && root.currentNotification.apiCardId > 0)
+                root.clearNotification()
             root.expanded = false
             root.settle()
         }
@@ -355,7 +495,9 @@ Window {
             // island card is shown (the one built in showReminder()).
             if (notification.appName === "Dynamic Island")
                 return
-            root.currentNotification = notification
+            // Replacing a card: report the dismissal of an API card before
+            // dropping it, so every shown id gets exactly one CardDismissed.
+            root.replaceNotification(notification)
             root.mode = "notification"
             root.page = "notification"
             root.expandBriefly(Config.notificationTimeout)
@@ -371,7 +513,7 @@ Window {
             const trackedId = root.currentNotification.id
             if (trackedId !== id && trackedId !== 0)
                 return
-            root.currentNotification = null
+            root.clearNotification()
             if (root.mode === "notification") {
                 root.expanded = false
                 root.settle()
@@ -388,7 +530,83 @@ Window {
         }
     }
 
+    // ---- D-Bus API requests -------------------------------------------------
+    // The island only ever reacts to these signals; it never exposes its UI to
+    // the service. `IslandApi`'s live state is written back through the
+    // bindings below.
+    Connections {
+        target: IslandApi
+
+        function onCardRequested(id, appName, title, body, icon, urgency, timeoutMs) {
+            root.showApiCard(id, appName, title, body, icon, urgency, timeoutMs)
+        }
+
+        function onCardDismissRequested(id) {
+            if (root.currentNotification !== null
+                    && root.currentNotification.apiCardId === id) {
+                root.clearNotification()
+                if (root.mode === "notification") {
+                    root.expanded = false
+                    root.settle()
+                }
+            }
+        }
+
+        function onDismissAllRequested() {
+            root.clearNotification()
+            if (root.mode === "notification") {
+                root.expanded = false
+                root.settle()
+            }
+        }
+
+        function onExpandRequested(expanded) {
+            if (expanded)
+                root.expandFromApi()
+            else
+                root.collapseFromApi()
+        }
+
+        function onPageRequested(pageId) {
+            root.showPageFromApi(pageId)
+        }
+
+        function onWidgetRequested(widgetId) {
+            root.showWidgetFromApi(widgetId)
+        }
+
+        function onHideWidgetRequested() {
+            root.hideWidget()
+        }
+
+        // A rescan (for example `ReloadWidgets`) can drop the widget that is
+        // currently shown. Reset the bridge state so `GetStatus.widget` does
+        // not keep a stale id and the page falls back to the default.
+        function onWidgetsChanged() {
+            if (root.widget !== "" && IslandApi.widgets.indexOf(root.widget) < 0)
+                root.hideWidget()
+        }
+    }
+
+    // Live state written back so `GetStatus()` and the API's own signals are
+    // truthful. These bindings re-evaluate whenever the island changes.
+    Binding { target: IslandApi; property: "mode"; value: root.mode }
+    Binding { target: IslandApi; property: "page"; value: root.page }
+    Binding { target: IslandApi; property: "expanded"; value: root.expanded }
+    Binding { target: IslandApi; property: "widget"; value: root.widget }
+
+    Connections {
+        target: root
+        function onPagesChanged() {
+            IslandApi.setAvailablePages(root.pages)
+        }
+    }
+
     Component.onCompleted: {
+        // Publish the offered pages so IslandApi.ListPages() is truthful from
+        // the start (subsequent changes flow through onPagesChanged).
+        IslandApi.setAvailablePages(root.pages)
+
         // Adopt whatever the media backend already knows at startup.
         if (media.available && media.title !== "")
             root.showMedia()
