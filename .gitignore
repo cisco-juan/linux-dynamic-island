@@ -1,0 +1,14 @@
+# Build artifacts from the C++ QML plugin (qmake6 in-place build)
+imports/Island/*.o
+imports/Island/moc_*.cpp
+imports/Island/moc_*.h
+imports/Island/*.so
+imports/Island/.qmake.stash
+imports/Island/Makefile
+imports/Island/Makefile.*
+imports/Island/qrc_*.cpp
+imports/Island/islandplugin_plugin.cpp
+
+# Local test artifacts
+qa-runs/
+*.log
