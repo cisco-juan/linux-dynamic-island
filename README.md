@@ -71,8 +71,9 @@ is available.
 | Page | Shown when |
 |------|------------|
 | `media` | An MPRIS player is available with a non-empty title |
-| `calendar` | Always (current-month grid, today circled) |
-| `settings` | At least one of its backends is available (see below) — placed after `calendar` |
+| `calendar` | Always (current-month grid, today circled, dots on days with events) |
+| `agenda` | Always — the events of the selected day, with an inline create form |
+| `settings` | At least one of its backends is available (see below) — placed after `agenda` |
 | `customize` | Always — placed after `settings`, before `notification`. Configures the island itself |
 | `notification` | A notification is active |
 
@@ -82,8 +83,74 @@ available, else calendar); after an auto-collapse the card settles back to that
 default. Chevron clicks are consumed, so clicking anywhere else on the card
 still toggles collapse.
 
-### Settings page
+### Agenda page and events
 
+Clicking a day in the calendar selects it and jumps straight to the `agenda`
+page, which lists that day's events, sorted by time (all-day first). The header
+shows the selected day, locale-aware (for example `Wednesday, Sep 24`), with a
+small **Today** button when the selected day is not today. Each row shows the
+time (`HH:MM`, or `All day`) and the title, plus a small delete button; the list
+scrolls and shows a `No events` empty state.
+
+**+ New** opens an inline create form:
+
+| Field | Control | Notes |
+|-------|---------|-------|
+| Title | Text input | Required; empty titles are ignored |
+| Time | `HH:MM` input | Defaults to the next full hour; leave empty for an all-day event |
+| Reminder | Cycle button | `Off` / `5` / `10` / `30` / `60` min; starts on `reminderLeadMinutes` |
+| Save / Cancel | Buttons | `Enter` saves, `Escape` cancels while the form is focused |
+
+The events live in the island's own JSON store — no KDE PIM (Akonadi /
+KOrganizer) is required:
+
+```
+~/.config/dynamic-island/events.json
+```
+
+It is created lazily on the first event and written **atomically** (`QSaveFile`:
+a temporary file is renamed into place, so a crash mid-write cannot truncate
+it). One object per event:
+
+```json
+{ "id": 3, "title": "Design review", "date": "2026-09-24", "time": "09:30",
+  "note": "", "reminderMinutes": 10, "reminderFired": false }
+```
+
+`time` is `"HH:MM"` or `""` for an all-day event; `reminderMinutes` is `-1` for
+`Off`. Calendar dots mark every day that has at least one event, and they update
+the moment an event is added or removed.
+
+Keyboard input is the one place the island deliberately takes focus: while the
+create form is open, the layer-shell surface switches to
+`keyboardInteractivity: OnDemand`, which makes the compositor activate the
+surface, and the title input takes focus itself via `forceActiveFocus()` (`Enter`
+saves, `Escape` cancels). When the form closes, focus is cleared and the surface
+returns to `keyboardInteractivity: None`. `requestActivate()` is a no-op here
+because the window carries `Qt::WindowDoesNotAcceptFocus`; the layer-shell
+keyboard-interactivity switch is what activates the surface. On KWin 6.7 the
+focus state was verified to work, so the form is inline; `kdialog` is not needed.
+
+### Reminders
+
+A reminder is a per-event lead time (Off / 5 / 10 / 30 / 60 min). A 30 s timer
+checks every event and, once an event enters its window, shows the island card
+with the event title and either `Starts in N min — HH:MM` or `Now — HH:MM`, plus
+a small calendar icon. Each reminder fires **exactly once**: the event is marked
+`reminderFired` and persisted, so a restart does not re-fire it. A reminder the
+island missed by more than **5 minutes** (the app was closed, the machine was
+asleep) is marked fired **silently** — it never nags later.
+
+By default the reminder is also posted to `org.freedesktop.Notifications`, so it
+lands in KDE's notification history. That post is exactly what the island's own
+notification monitor observes, so notifications from `Dynamic Island` are
+ignored on the monitor path: **one** island card is shown, not two. KDE may
+still show its own notification popup for the posted reminder — that is the
+notification daemon's behavior, independent of the island. Set
+`postReminders=false` in the config file to show the island card only and keep
+the reminder out of KDE's history.
+
+### Settings page
 The `settings` page shows three rows — volume, brightness and bluetooth — with
 hand-rolled sliders and a pill toggle that match the dark card. Each row is
 hidden when its backend is unavailable, and the page itself is absent from the
@@ -203,6 +270,8 @@ is stopped is supported; unknown/missing keys fall back to the defaults below.
 | `animationDuration` | 0–600 ms (0 = animations off) | `300` |
 | `easing` | `back` / `cubic` / `quad` | `back` |
 | `screenMode` | `default` / `active` / a screen name (`HDMI-A-1`, `eDP-1`, …) | `default` |
+| `reminderLeadMinutes` | 0–120 min (default lead offered by the create form) | `10` |
+| `postReminders` | `true` / `false` (also post reminders to KDE's notification history) | `true` |
 
 A legacy stored value of `primary` is read back as `default`, so an existing
 `config.ini` cannot keep the island pinned to Qt's primary screen.
@@ -221,6 +290,7 @@ scaled. The most useful base values:
 | `mediaCompactWidth` / `mediaExpandedHeight` | `240` / `164` | Media pill sizes (× `scale`) |
 | `notificationCompactWidth` / `notificationExpandedHeight` | `340` / `116` | Notification pill sizes (× `scale`) |
 | `customizeWidth` / `customizeHeight` | `470` / `222` | Customize page card size (× `scale`) |
+| `agendaWidth` / `agendaHeight` | `420` / `220` | Agenda page card size (× `scale`) |
 | `expandedRadius` | `14` | Corner radius of the expanded card. The compact pill always keeps `height / 2` (a full pill); the expanded card uses this small radius so it reads as a square-ish card. The radius animates together with the size morph |
 | `sizeDuration` | from `animationDuration` | Pill resize animation (ms) |
 | `fadeDuration` | `min(150, animationDuration)` | Content cross-fade (ms); `0` when animations are off |
@@ -237,13 +307,20 @@ aid for screenshot verification of the expanded card.
 | Variable | Effect |
 |----------|--------|
 | `ISLAND_DEBUG_EXPAND=1` | Start expanded |
-| `ISLAND_DEBUG_PAGE=<media\|calendar\|settings\|customize\|notification>` | Force the initial page. For `notification`, a placeholder notification is seeded when none exists so the page renders |
+| `ISLAND_DEBUG_PAGE=<media\|calendar\|agenda\|settings\|customize\|notification>` | Force the initial page. For `notification`, a placeholder notification is seeded when none exists so the page renders |
+| `ISLAND_DEBUG_DATE=YYYY-MM-DD` | Force the selected agenda date (for screenshots); ignored when unset or malformed |
 
 ```bash
 # Capture a specific page (e.g. for visual review)
 ISLAND_DEBUG_EXPAND=1 ISLAND_DEBUG_PAGE=calendar ./run.sh &
 sleep 2.5
 spectacle -b -n -f -o /tmp/opencode/island-calendar.png
+kill %1
+
+# Capture the agenda for a specific day
+ISLAND_DEBUG_EXPAND=1 ISLAND_DEBUG_PAGE=agenda ISLAND_DEBUG_DATE=2026-09-24 ./run.sh &
+sleep 2.5
+spectacle -b -n -f -o /tmp/opencode/island-agenda.png
 kill %1
 ```
 
@@ -262,7 +339,8 @@ dynamic-island/
 │   ├── Island.qml             # pill/card container, view cross-fade, hover/click, page nav
 │   ├── IdleView.qml
 │   ├── MediaView.qml          # art, title/artist, progress, transport controls
-│   ├── CalendarView.qml       # locale-aware current-month grid, today circled
+│   ├── CalendarView.qml       # locale-aware current-month grid, today circled, event dots
+│   ├── AgendaView.qml         # selected-day event list + inline create form
 │   ├── SettingsView.qml       # volume/brightness sliders + bluetooth toggle
 │   ├── CustomizeView.qml      # alignment/scale/opacity/timing/screen controls
 │   ├── NotificationView.qml   # app icon, app name, summary, body
@@ -281,6 +359,8 @@ dynamic-island/
     ├── volumecontrol.cpp/.h         # WirePlumber `wpctl` volume/mute
     ├── brightnesscontrol.cpp/.h     # PowerDevil backlight brightness
     ├── bluetoothcontrol.cpp/.h      # BlueZ adapter power + connected devices
+    ├── eventstore.cpp/.h            # JSON event store + reminder scheduler
+    ├── eventnotifier.cpp/.h         # posts reminders to org.freedesktop.Notifications
     └── qmldir
 ```
 
@@ -335,6 +415,8 @@ bash -n run.sh install.sh
 - [ ] `notify-send -a "Dynamic Island" "Test" "Hello island"` expands the pill.
 - [ ] Playing media in a browser/player shows title, artist and progress.
 - [ ] Play/pause/next/previous buttons control the active player.
+- [ ] Clicking a calendar day opens the agenda with that day's events; `+ New` creates one, and it shows as a dot on the calendar.
+- [ ] A due reminder expands the island with the event title and (by default) appears in KDE's notification history once.
 - [ ] The `customize` page changes alignment, scale, opacity, timing and screen live, and the values survive a restart (`~/.config/dynamic-island/config.ini`).
 - [ ] `./install.sh` writes the autostart entry; `./install.sh --uninstall` removes it.
 
@@ -342,7 +424,6 @@ bash -n run.sh install.sh
 
 Click-to-invoke notification actions, notification stacking/history, and
 packaging are intentionally deferred.
-
 ## License
 
 Released under the [MIT License](LICENSE).

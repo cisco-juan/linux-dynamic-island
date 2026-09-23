@@ -21,11 +21,17 @@ Rectangle {
     property var volume
     property var brightness
     property var bluetooth
+    property string selectedDate: ""
 
     readonly property bool hovered: hoverHandler.hovered
-    // Forwarded from the settings and customize pages so main.qml can keep the
-    // card expanded while the user drags a slider or presses a control.
+    // Forwarded from the settings, customize and agenda pages so main.qml can
+    // keep the card expanded while the user drags a slider or presses a
+    // control.
     property bool interacting: settingsView.interacting || customizeView.interacting
+                               || agendaView.interacting
+    // True while the agenda create form is open: main.qml uses it to switch the
+    // layer-shell keyboard interactivity on and request activation.
+    readonly property bool keyboardRequested: agendaView.formOpen
     // Navigation is only meaningful while expanded with somewhere to go.
     readonly property bool showNavigation: expanded && pages.length > 1
 
@@ -36,6 +42,8 @@ Rectangle {
     signal toggleRequested()
     signal nextPageRequested()
     signal previousPageRequested()
+    signal dayClicked(string isoDate)
+    signal dateChanged(string isoDate)
 
     anchors.top: parent.top
     anchors.topMargin: Config.topPadding
@@ -82,9 +90,22 @@ Rectangle {
 
     CalendarView {
         anchors.fill: parent
+        selectedDate: pill.selectedDate
         opacity: pill.activeView === "calendar" ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
+        onDayClicked: function(isoDate) { pill.dayClicked(isoDate) }
+    }
+
+    AgendaView {
+        id: agendaView
+        anchors.fill: parent
+        selectedDate: pill.selectedDate
+        active: pill.expanded && pill.activeView === "agenda"
+        opacity: pill.activeView === "agenda" ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Config.fadeDuration } }
+        onDateChanged: function(isoDate) { pill.dateChanged(isoDate) }
     }
 
     SettingsView {

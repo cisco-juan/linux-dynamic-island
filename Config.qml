@@ -49,6 +49,11 @@ QtObject {
     readonly property int customizeWidth: Math.round(470 * scale)
     readonly property int customizeHeight: Math.round(222 * scale)
 
+    // Agenda page card: a day header, a scrollable event list and the inline
+    // create form.
+    readonly property int agendaWidth: Math.round(420 * scale)
+    readonly property int agendaHeight: Math.round(220 * scale)
+
     // Corner radius of the expanded card. The compact pill always keeps
     // `height / 2` (a full pill); the expanded card uses this small radius so
     // it reads as a square-ish card instead of an oversized pill.

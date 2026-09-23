@@ -14,7 +14,9 @@ SOURCES += \
     notificationmonitor.cpp \
     volumecontrol.cpp \
     brightnesscontrol.cpp \
-    bluetoothcontrol.cpp
+    bluetoothcontrol.cpp \
+    eventstore.cpp \
+    eventnotifier.cpp
 
 HEADERS += \
     island_plugin.h \
@@ -23,7 +25,9 @@ HEADERS += \
     notificationmonitor.h \
     volumecontrol.h \
     brightnesscontrol.h \
-    bluetoothcontrol.h
+    bluetoothcontrol.h \
+    eventstore.h \
+    eventnotifier.h
 
 # Keep the plugin loadable from QML without installing anything system-wide.
 target.path = $$PWD

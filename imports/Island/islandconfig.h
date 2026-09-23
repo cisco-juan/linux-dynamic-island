@@ -31,6 +31,10 @@ class IslandConfig : public QObject
     Q_PROPERTY(QStringList screenNames READ screenNames NOTIFY screenNamesChanged)
     Q_PROPERTY(QScreen *targetScreen READ targetScreen NOTIFY targetScreenChanged)
     Q_PROPERTY(bool followActiveScreen READ followActiveScreen NOTIFY followActiveScreenChanged)
+    Q_PROPERTY(int reminderLeadMinutes READ reminderLeadMinutes WRITE setReminderLeadMinutes
+                   NOTIFY reminderLeadMinutesChanged)
+    Q_PROPERTY(bool postReminders READ postReminders WRITE setPostReminders
+                   NOTIFY postRemindersChanged)
 
 public:
     explicit IslandConfig(QObject *parent = nullptr);
@@ -49,6 +53,8 @@ public:
     QStringList screenNames() const { return m_screenNames; }
     QScreen *targetScreen() const { return m_targetScreen; }
     bool followActiveScreen() const { return m_screenMode == QLatin1String("active"); }
+    int reminderLeadMinutes() const { return m_reminderLeadMinutes; }
+    bool postReminders() const { return m_postReminders; }
 
     void setAlignment(const QString &value);
     void setTopOffset(int value);
@@ -57,6 +63,8 @@ public:
     void setAnimationDuration(int value);
     void setEasing(const QString &value);
     void setScreenMode(const QString &value);
+    void setReminderLeadMinutes(int value);
+    void setPostReminders(bool value);
 
 public slots:
     // Restore every knob to its default and persist immediately.
@@ -77,6 +85,8 @@ signals:
     void screenNamesChanged();
     void targetScreenChanged();
     void followActiveScreenChanged();
+    void reminderLeadMinutesChanged();
+    void postRemindersChanged();
 
 private slots:
     // Re-read the screen list and re-resolve the target after a hotplug, a
@@ -96,6 +106,8 @@ private:
     int m_animationDuration = 300;
     QString m_easing = QStringLiteral("back");
     QString m_screenMode = QStringLiteral("default");
+    int m_reminderLeadMinutes = 10;
+    bool m_postReminders = true;
 
     QStringList m_screenNames;
     QScreen *m_targetScreen = nullptr;

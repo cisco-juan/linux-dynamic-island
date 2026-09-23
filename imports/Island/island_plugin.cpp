@@ -2,6 +2,8 @@
 
 #include "bluetoothcontrol.h"
 #include "brightnesscontrol.h"
+#include "eventnotifier.h"
+#include "eventstore.h"
 #include "islandconfig.h"
 #include "mediacontroller.h"
 #include "notificationmonitor.h"
@@ -25,6 +27,8 @@ QJSValue makeDebugFlags(QQmlEngine *, QJSEngine *engine)
                       qEnvironmentVariableIntValue("ISLAND_DEBUG_EXPAND") == 1);
     flags.setProperty(QStringLiteral("page"),
                       QString::fromLocal8Bit(qgetenv("ISLAND_DEBUG_PAGE")).trimmed());
+    flags.setProperty(QStringLiteral("date"),
+                      QString::fromLocal8Bit(qgetenv("ISLAND_DEBUG_DATE")).trimmed());
     return flags;
 }
 
@@ -40,6 +44,23 @@ QObject *makeIslandConfig(QQmlEngine *engine, QJSEngine *)
     return config;
 }
 
+// Providers for the event singletons, with the same ownership contract.
+QObject *makeEventStore(QQmlEngine *engine, QJSEngine *)
+{
+    Q_UNUSED(engine)
+    EventStore *store = EventStore::instance();
+    QQmlEngine::setObjectOwnership(store, QQmlEngine::CppOwnership);
+    return store;
+}
+
+QObject *makeEventNotifier(QQmlEngine *engine, QJSEngine *)
+{
+    Q_UNUSED(engine)
+    EventNotifier *notifier = EventNotifier::instance();
+    QQmlEngine::setObjectOwnership(notifier, QQmlEngine::CppOwnership);
+    return notifier;
+}
+
 } // namespace
 
 void IslandPlugin::registerTypes(const char *uri)
@@ -51,4 +72,6 @@ void IslandPlugin::registerTypes(const char *uri)
     qmlRegisterType<BluetoothControl>(uri, 1, 0, "BluetoothControl");
     qmlRegisterSingletonType(uri, 1, 0, "Debug", makeDebugFlags);
     qmlRegisterSingletonType<IslandConfig>(uri, 1, 0, "IslandConfig", makeIslandConfig);
+    qmlRegisterSingletonType<EventStore>(uri, 1, 0, "EventStore", makeEventStore);
+    qmlRegisterSingletonType<EventNotifier>(uri, 1, 0, "EventNotifier", makeEventNotifier);
 }

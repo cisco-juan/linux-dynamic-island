@@ -17,21 +17,26 @@ Window {
     property bool expanded: false
     property var currentNotification: null
 
-    // Page shown by the expanded card: "media" | "calendar" | "settings" | "notification".
+    // Page shown by the expanded card: "media" | "calendar" | "agenda" |
+    // "settings" | "customize" | "notification".
     property string page: "calendar"
+
+    // ISO date shown by the agenda page; day clicks in the calendar move it.
+    property string selectedDate: Qt.formatDate(new Date(), "yyyy-MM-dd")
 
     // The settings page is offered only while at least one of its backends
     // (volume, brightness, bluetooth) is available.
     readonly property bool settingsAvailable: volume.available || brightness.available
                                              || bluetooth.available
 
-    // Pages available right now. Calendar is always present; the others only
-    // while they have something to show.
+    // Pages available right now. Calendar is always present; the agenda always
+    // follows it, so a reminder or a day click has a destination.
     readonly property var pages: {
         var list = []
         if (media.available && media.title !== "")
             list.push("media")
         list.push("calendar")
+        list.push("agenda")
         if (root.settingsAvailable)
             list.push("settings")
         list.push("customize")
@@ -43,6 +48,7 @@ Window {
     readonly property int targetWidth: {
         if (root.expanded)
             return root.page === "customize" ? Config.customizeWidth
+                 : root.page === "agenda" ? Config.agendaWidth
                                              : Config.mediaExpandedWidth
         if (mode === "notification")
             return Config.notificationCompactWidth
@@ -57,6 +63,8 @@ Window {
                 return Config.notificationExpandedHeight
             if (root.page === "customize")
                 return Config.customizeHeight
+            if (root.page === "agenda")
+                return Config.agendaHeight
             return Config.mediaExpandedHeight
         }
         if (mode === "notification")
@@ -85,7 +93,15 @@ Window {
             value |= LayerShell.Window.AnchorRight
         return value
     }
-    LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
+    // Layer-shell keyboard interactivity: None by default (the surface must not
+    // steal focus), OnDemand while the agenda create form needs typed input.
+    // The OnDemand switch is what makes KWin activate the surface;
+    // requestActivate() is a no-op here because the window carries
+    // Qt::WindowDoesNotAcceptFocus. The form's title input takes focus itself
+    // through forceActiveFocus() when the form opens.
+    LayerShell.Window.keyboardInteractivity: island.keyboardRequested
+        ? LayerShell.Window.KeyboardInteractivityOnDemand
+        : LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.exclusionZone: 0
     LayerShell.Window.scope: "dynamic-island"
 
@@ -127,6 +143,7 @@ Window {
         expanded: root.expanded
         page: root.page
         pages: root.pages
+        selectedDate: root.selectedDate
         media: media
         notification: root.currentNotification
         volume: volume
@@ -135,9 +152,31 @@ Window {
         onToggleRequested: root.toggle()
         onNextPageRequested: root.cyclePage(1)
         onPreviousPageRequested: root.cyclePage(-1)
+        onDayClicked: function(isoDate) { root.openAgenda(isoDate) }
+        onDateChanged: function(isoDate) { root.selectedDate = isoDate }
+    }
+
+    // While the create form is open the surface must be keyboard-active; when
+    // it closes, focus is released and the surface returns to None.
+    Connections {
+        target: island
+        function onKeyboardRequestedChanged() {
+            if (island.keyboardRequested) {
+                root.requestActivate()
+            } else {
+                // No-op with Qt::WindowDoesNotAcceptFocus; the layer-shell
+                // keyboardInteractivity switch above does the real work.
+                root.requestActivate()
+            }
+        }
     }
 
     // ---- behavior ----------------------------------------------------------
+    function isValidIsoDate(value) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(value)
+            && !isNaN(new Date(value + "T00:00:00").getTime())
+    }
+
     function defaultPage() {
         if (root.currentNotification !== null)
             return "notification"
@@ -187,12 +226,53 @@ Window {
         collapseTimer.restart()
     }
 
+    // A day click in the calendar selects the date and jumps to the agenda.
+    function openAgenda(isoDate) {
+        if (isoDate !== "")
+            root.selectedDate = isoDate
+        root.page = "agenda"
+        root.expanded = true
+        collapseTimer.stop()
+    }
+
+    // Body for the reminder card: "Starts in N min — HH:MM" (or "Now — HH:MM"
+    // once the event has started).
+    function reminderBody(event) {
+        const time = event.time
+        const now = new Date()
+        const start = new Date(event.date + "T" + time + ":00")
+        const minutes = Math.round((start - now) / 60000)
+        if (minutes > 0)
+            return "Starts in " + minutes + " min \u2014 " + time
+        return "Now \u2014 " + time
+    }
+
+    // Show the reminder as an island card, and (optionally) post it through
+    // org.freedesktop.Notifications so it lands in KDE's notification history.
+    function showReminder(event) {
+        const body = root.reminderBody(event)
+        root.currentNotification = {
+            "appName": "Dynamic Island",
+            "appIcon": "view-calendar",
+            "summary": event.title,
+            "body": body,
+            "id": 0
+        }
+        root.mode = "notification"
+        root.page = "notification"
+        root.expandBriefly(Config.notificationTimeout)
+
+        if (IslandConfig.postReminders) {
+            EventNotifier.post("Dynamic Island", event.title, body, "view-calendar")
+        }
+    }
+
     // Dev/test hook: force the page requested through ISLAND_DEBUG_PAGE. For
     // `notification`, seed a placeholder when no real notification exists so
     // the page has something to render.
     function forceDebugPage(id) {
-        if (id !== "media" && id !== "calendar" && id !== "settings"
-                && id !== "customize" && id !== "notification")
+        if (id !== "media" && id !== "calendar" && id !== "agenda"
+                && id !== "settings" && id !== "customize" && id !== "notification")
             return
         if (id === "notification" && root.currentNotification === null) {
             root.currentNotification = {
@@ -271,6 +351,10 @@ Window {
         target: notifier
 
         function onNotificationReceived(notification) {
+            // Ignore the echo of a reminder we posted ourselves, so exactly one
+            // island card is shown (the one built in showReminder()).
+            if (notification.appName === "Dynamic Island")
+                return
             root.currentNotification = notification
             root.mode = "notification"
             root.page = "notification"
@@ -297,12 +381,24 @@ Window {
         }
     }
 
+    Connections {
+        target: EventStore
+        function onReminderDue(event) {
+            root.showReminder(event)
+        }
+    }
+
     Component.onCompleted: {
         // Adopt whatever the media backend already knows at startup.
         if (media.available && media.title !== "")
             root.showMedia()
         if (media.playing)
             root.expandBriefly(Config.mediaExpandTimeout)
+
+        // Dev/test hook: force the selected agenda date, so screenshots can
+        // target a specific day. Ignored when unset or malformed.
+        if (Debug.date !== "" && isValidIsoDate(Debug.date))
+            root.selectedDate = Debug.date
 
         // Dev/test hook: force the initial state so screenshots can target a
         // specific page. No effect unless the env vars are set.

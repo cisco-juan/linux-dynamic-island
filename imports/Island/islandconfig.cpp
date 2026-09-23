@@ -18,10 +18,14 @@ constexpr double kMinOpacity = 0.5;
 constexpr double kMaxOpacity = 1.0;
 constexpr int kMinAnimationDuration = 0;
 constexpr int kMaxAnimationDuration = 600;
+constexpr int kMinReminderLead = 0;
+constexpr int kMaxReminderLead = 120;
 
 const QString kDefaultAlignment = QStringLiteral("center");
 const QString kDefaultEasing = QStringLiteral("back");
 const QString kDefaultScreenMode = QStringLiteral("default");
+constexpr int kDefaultReminderLead = 10;
+constexpr bool kDefaultPostReminders = true;
 
 QString normalizeAlignment(const QString &value)
 {
@@ -121,6 +125,12 @@ void IslandConfig::load()
         settings.value(QStringLiteral("easing"), m_easing).toString());
     m_screenMode = normalizeScreenMode(
         settings.value(QStringLiteral("screenMode"), m_screenMode).toString());
+    m_reminderLeadMinutes =
+        qBound(kMinReminderLead,
+               settings.value(QStringLiteral("reminderLeadMinutes"), m_reminderLeadMinutes).toInt(),
+               kMaxReminderLead);
+    m_postReminders =
+        settings.value(QStringLiteral("postReminders"), m_postReminders).toBool();
 }
 
 void IslandConfig::save()
@@ -135,6 +145,8 @@ void IslandConfig::save()
     settings.setValue(QStringLiteral("animationDuration"), m_animationDuration);
     settings.setValue(QStringLiteral("easing"), m_easing);
     settings.setValue(QStringLiteral("screenMode"), m_screenMode);
+    settings.setValue(QStringLiteral("reminderLeadMinutes"), m_reminderLeadMinutes);
+    settings.setValue(QStringLiteral("postReminders"), m_postReminders);
     settings.sync();
 }
 
@@ -270,6 +282,25 @@ void IslandConfig::setScreenMode(const QString &value)
     }
 }
 
+void IslandConfig::setReminderLeadMinutes(int value)
+{
+    const int clamped = qBound(kMinReminderLead, value, kMaxReminderLead);
+    if (clamped == m_reminderLeadMinutes)
+        return;
+    m_reminderLeadMinutes = clamped;
+    emit reminderLeadMinutesChanged();
+    scheduleSave();
+}
+
+void IslandConfig::setPostReminders(bool value)
+{
+    if (value == m_postReminders)
+        return;
+    m_postReminders = value;
+    emit postRemindersChanged();
+    scheduleSave();
+}
+
 void IslandConfig::reset()
 {
     setAlignment(kDefaultAlignment);
@@ -279,5 +310,7 @@ void IslandConfig::reset()
     setAnimationDuration(300);
     setEasing(kDefaultEasing);
     setScreenMode(kDefaultScreenMode);
+    setReminderLeadMinutes(kDefaultReminderLead);
+    setPostReminders(kDefaultPostReminders);
     save();
 }
