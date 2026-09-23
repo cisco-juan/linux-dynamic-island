@@ -9,7 +9,7 @@ Plasma applet, so it never steals focus and leaves no taskbar entry.
 
 <div align="center">
 
-[![Built with Gentle-AI](https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/docs/assets/brand/built-with-gentle-ai.png)](https://github.com/Gentleman-Programming/gentle-ai)
+[![Built with Gentle-AI](https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/docs/assets/brand/built-with-gentle-ai.png)](https://github.com/Gentleman-Programming/gentle-ai) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
@@ -137,6 +137,34 @@ the card will not collapse while a control is pressed (`Island.interacting`).
   (`wantsToBeOnActiveScreen`); a screen name pins it to that monitor. If the
   chosen monitor is disconnected, the island falls back to the primary one.
 
+## Screenshots
+
+Every state below is rendered from the **real** components
+([`components/`](components) + [`Config.qml`](Config.qml)) by
+[`tools/screenshots.qml`](tools/screenshots.qml) with neutral demo data: no
+desktop, MPRIS player, notification daemon or user content is involved.
+
+<div align="center">
+
+![Dynamic Island states](docs/screenshots/overview.png)
+
+</div>
+
+| State | Caption | Image |
+|-------|---------|-------|
+| Media | Now-playing card: art, title/artist, progress and transport controls | [media.png](docs/screenshots/media.png) |
+| Notification | App icon, app name, summary and body | [notification.png](docs/screenshots/notification.png) |
+| Calendar | Locale-aware current-month grid with today circled | [calendar.png](docs/screenshots/calendar.png) |
+| Settings | Volume, brightness and bluetooth rows | [settings.png](docs/screenshots/settings.png) |
+| Customize | Alignment, offset, scale, opacity, timing, easing and screen | [customize.png](docs/screenshots/customize.png) |
+| Compact | Idle pill with the pulsing dot | [compact.png](docs/screenshots/compact.png) |
+
+Regenerate the whole set (2x PNGs, offscreen) with:
+
+```bash
+./tools/make-screenshots.sh
+```
+
 ## Details
 
 | Topic | Decision |
@@ -239,6 +267,11 @@ dynamic-island/
 │   ├── CustomizeView.qml      # alignment/scale/opacity/timing/screen controls
 │   ├── NotificationView.qml   # app icon, app name, summary, body
 │   └── IconButton.qml
+├── tools/                     # README screenshot tooling
+│   ├── screenshots.qml        # offscreen harness: real components + mock data
+│   └── make-screenshots.sh    # runs the harness + builds overview.png
+├── docs/
+│   └── screenshots/           # generated README screenshots (2x PNGs)
 └── imports/Island/            # C++ QML plugin, module "Island"
     ├── Island.pro
     ├── island_plugin.cpp/.h         # registers the types + the `Debug`/`IslandConfig` singletons
@@ -309,3 +342,7 @@ bash -n run.sh install.sh
 
 Click-to-invoke notification actions, notification stacking/history, and
 packaging are intentionally deferred.
+
+## License
+
+Released under the [MIT License](LICENSE).
