@@ -1,0 +1,22 @@
+name: Enforce branch flow
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions: {}
+
+jobs:
+  enforce-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only develop can be merged into the production branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$HEAD_REF" != "develop" ]; then
+            echo "::error::PRs into $BASE_REF must come from develop (got: $HEAD_REF)."
+            exit 1
+          fi
+          echo "OK: develop -> $BASE_REF"
